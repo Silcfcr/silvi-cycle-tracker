@@ -248,11 +248,15 @@ function RecentStrip({ data, onDaySelect }) {
   const days = [];
   for (let i = 13; i >= 0; i--) days.push(addDays(new Date(), -i));
   const phaseColor = { period: "#D4748F", follicular: "#F4C9B9", fertile: "#C9A2D6", ovulation: "#C26FA6", luteal: "#F3D9E2" };
+  const scrollRef = React.useRef(null);
+  React.useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+  }, []);
   return (
     <div className="card" style={{ padding: "20px 6px 18px" }}>
       <div className="section-label" style={{ margin: "0 14px 6px" }}>Last 14 days</div>
       <div style={{ fontSize: 12, color: "var(--muted)", margin: "0 14px 16px", lineHeight: 1.4 }}>Tap any day to log or edit mood and weight.</div>
-      <div style={{ display: "flex", gap: 4, overflowX: "auto", padding: "0 12px 4px", scrollbarWidth: "none" }}>
+      <div ref={scrollRef} style={{ display: "flex", gap: 4, overflowX: "auto", padding: "0 12px 4px", scrollbarWidth: "none" }}>
         {days.map(function(d, i) {
           const key = toKey(d);
           const info = cycleInfo(data.setup, d);
@@ -262,7 +266,8 @@ function RecentStrip({ data, onDaySelect }) {
             <button key={key} onClick={function() { onDaySelect(d); }}
               style={{ flex: "0 0 auto", width: 34, display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
                 cursor: "pointer", background: "none", border: "none", padding: 0, touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: isToday ? "var(--rose-600)" : "var(--muted)" }}>{DOW[d.getDay()][0]}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: isToday ? "var(--rose-600)" : "var(--ink)", lineHeight: 1 }}>{d.getDate()}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: isToday ? "var(--rose-600)" : "var(--muted)", lineHeight: 1 }}>{DOW[d.getDay()].slice(0, 2).toLowerCase()}</span>
               <div style={{ width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                 background: mood != null ? "var(--blush-50)" : "transparent",
                 border: mood != null ? "none" : "1.5px dashed var(--line)" }}>

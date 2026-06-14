@@ -165,6 +165,7 @@ async function loadFromSupabase(userId) {
 
 /* ── useStore (Supabase-backed) ──────────────────────────── */
 function useStore(userId) {
+  const [ready, setReady] = React.useState(false);
   const [data, setData] = React.useState(() => {
     const s = loadStore();
     return {
@@ -178,12 +179,14 @@ function useStore(userId) {
   });
 
   React.useEffect(() => {
-    if (!userId || !initSupabase()) return;
+    if (!userId) { setReady(true); return; }
+    const sb = initSupabase();
+    if (!sb) { setReady(true); return; }
     loadFromSupabase(userId).then(remote => {
       if (!remote.measurements) remote.measurements = {};
       setData(remote);
       try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch {}
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setReady(true));
   }, [userId]);
 
   React.useEffect(() => {
@@ -292,7 +295,7 @@ function useStore(userId) {
     reset: () => setData({ setup: null, moods: {}, weights: {}, units: 'kg', periods: [], measurements: {} }),
   }), [userId]);
 
-  return [data, api];
+  return [data, api, ready];
 }
 
 export {

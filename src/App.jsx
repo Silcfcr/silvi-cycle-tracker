@@ -19,7 +19,7 @@ const TWEAK_DEFAULTS = {
 
 export default function App() {
   const [userId, setUserId] = React.useState(() => localStorage.getItem('silvi_user_id'));
-  const [data, api] = useStore(userId);
+  const [data, api, ready] = useStore(userId);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   React.useEffect(() => {
@@ -35,9 +35,11 @@ export default function App() {
     <React.Fragment>
       {!userId
         ? <LoginScreen onLogin={setUserId} />
-        : !data.setup
-          ? <Onboarding onDone={api.setSetup} userId={userId} />
-          : <Dashboard data={data} api={api} tweaks={t} userId={userId} />}
+        : !ready
+          ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
+          : !data.setup
+            ? <Onboarding onDone={api.setSetup} userId={userId} />
+            : <Dashboard data={data} api={api} tweaks={t} userId={userId} />}
       <TweaksPanel title="Tweaks">
         <TweakSection label="Accent" />
         <TweakColor label="Palette" value={t.accent}
