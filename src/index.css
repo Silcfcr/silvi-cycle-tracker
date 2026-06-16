@@ -465,6 +465,43 @@ h1,h2,h3,h4 { font-family: var(--serif); font-weight: 400; margin: 0; }
   padding: 26px 22px 40px;
 }
 
+/* ── Two-panel grid ──────────────────────────────────────────── */
+.content-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .app {
+    max-width: 1100px;
+  }
+  .band {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+  .sheet {
+    padding: 32px 36px 40px;
+    border-radius: 0;
+  }
+  .content-grid {
+    flex-direction: row;
+    align-items: start;
+    gap: 28px;
+  }
+  .col-left,
+  .col-right {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 /* ── Mood faces ──────────────────────────────────────────────── */
 .face {
   width: 46px; height: 46px; border-radius: 50%;
