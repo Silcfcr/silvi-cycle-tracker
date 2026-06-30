@@ -3,7 +3,7 @@ import {
   toKey, parseKey, addDays, daysBetween, fmtLong, fmtShort,
   MONTHS, DOW, PHASE, cycleInfo, isPredictedPeriod, daysUntil,
   KG_TO_LB, toDisplayWeight, fromDisplayWeight,
-  initSupabase, sendOTP, verifyOTP, ensureUserRow,
+  initSupabase, sendMagicLink,
   useStore, startOfDay,
 } from './lib.js';
 import { FaceSvg, MOOD_NAMES, MoodPicker, PhaseRing, CycleBar, Calendar, WeightChart, Stepper } from './components.jsx';
@@ -286,8 +286,7 @@ function RecentStrip({ data, onDaySelect }) {
 /* ── Login screen ──────────────────────────────────────────────────────────── */
 function LoginScreen() {
   const [email, setEmail] = React.useState('');
-  const [otp, setOtp] = React.useState('');
-  const [step, setStep] = React.useState('email'); // 'email' | 'otp' | 'loading' | 'error'
+  const [step, setStep] = React.useState('email'); // 'email' | 'sent' | 'loading' | 'error'
   const [errorMsg, setErrorMsg] = React.useState('');
 
   const handleEmail = async (e) => {
@@ -295,34 +294,15 @@ function LoginScreen() {
     if (!email.trim()) return;
     setStep('loading');
     try {
-      await sendOTP(email.trim().toLowerCase());
-      setStep('otp');
+      await sendMagicLink(email.trim().toLowerCase());
+      setStep('sent');
     } catch (err) {
-      setErrorMsg('Could not send code. Check your connection and try again.');
+      setErrorMsg('Could not send the link. Check your connection and try again.');
       setStep('error');
     }
   };
 
-  const handleOTP = async (e) => {
-    e.preventDefault();
-    if (!otp.trim()) return;
-    setStep('loading');
-    try {
-      const user = await verifyOTP(email.trim().toLowerCase(), otp.trim());
-      await ensureUserRow(user.id, user.email);
-      // onAuthStateChange in App.jsx handles the transition automatically
-    } catch (err) {
-      const isAuthError = err?.message?.toLowerCase().includes('token') ||
-        err?.message?.toLowerCase().includes('otp') ||
-        err?.status === 401 || err?.status === 403;
-      setErrorMsg(isAuthError
-        ? 'Incorrect or expired code. Try again.'
-        : 'Signed in but could not load your account. Please refresh.');
-      setStep('error');
-    }
-  };
-
-  const headings = { email: 'Welcome back.', otp: 'Check your email.', loading: 'Welcome back.', error: 'Welcome back.' };
+  const heading = step === 'sent' ? 'Check your inbox.' : 'Welcome back.';
 
   return (
     <div className="app">
@@ -332,7 +312,7 @@ function LoginScreen() {
         <div style={{ position: 'relative', paddingTop: 34 }}>
           <div className="eyebrow on-band">Silvi</div>
           <h1 style={{ fontSize: 30, color: '#fff', marginTop: 10, lineHeight: 1.12, letterSpacing: '-0.01em' }}>
-            {headings[step] || 'Welcome back.'}
+            {heading}
           </h1>
         </div>
       </div>
@@ -358,26 +338,18 @@ function LoginScreen() {
               <input className="input" type="email" placeholder="you@example.com"
                 value={email} onChange={e => setEmail(e.target.value)} autoFocus required />
             </div>
-            <button className="btn block" type="submit" disabled={!email.trim()}>Send code</button>
+            <button className="btn block" type="submit" disabled={!email.trim()}>Send magic link</button>
           </form>
         )}
 
-        {step === 'otp' && (
-          <form onSubmit={handleOTP} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              We sent a 6-digit code to <strong>{email}</strong>.
+        {step === 'sent' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <p style={{ fontSize: 14, color: 'var(--ink-soft)', margin: 0, lineHeight: 1.6 }}>
+              We sent a sign-in link to <strong>{email}</strong>. Click it and you'll be brought right back here.
             </p>
-            <div className="field">
-              <label>Verification code</label>
-              <input className="input" type="text" inputMode="numeric" pattern="[0-9]*"
-                placeholder="123456" maxLength={6}
-                value={otp} onChange={e => setOtp(e.target.value)} autoFocus required />
-            </div>
-            {errorMsg && <p style={{ color: 'var(--rose-600)', fontSize: 13, margin: 0 }}>{errorMsg}</p>}
-            <button className="btn block" type="submit" disabled={otp.trim().length < 6}>Verify</button>
             <button type="button" className="btn ghost block"
-              onClick={() => { setOtp(''); setErrorMsg(''); setStep('email'); }}>Back</button>
-          </form>
+              onClick={() => { setEmail(''); setStep('email'); }}>Use a different email</button>
+          </div>
         )}
       </div>
     </div>

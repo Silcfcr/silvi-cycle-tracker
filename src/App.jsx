@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStore, initSupabase } from './lib.js';
+import { useStore, initSupabase, ensureUserRow } from './lib.js';
 import { Dashboard, LoginScreen } from './Dashboard.jsx';
 import { Onboarding } from './Onboarding.jsx';
 import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio } from './tweaks.jsx';
@@ -27,8 +27,15 @@ export default function App() {
       setUserId(session?.user?.id ?? null);
       setAuthChecked(true);
     });
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
-      setUserId(session?.user?.id ?? null);
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        if (event === 'SIGNED_IN') {
+          ensureUserRow(session.user.id, session.user.email).catch(console.error);
+        }
+        setUserId(session.user.id);
+      } else {
+        setUserId(null);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);

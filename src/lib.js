@@ -91,17 +91,16 @@ function initSupabase() {
   return _sb;
 }
 
-async function sendOTP(email) {
+async function sendMagicLink(email) {
   const sb = initSupabase();
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const redirectTo = window.location.hostname === 'localhost'
+    ? `${window.location.origin}${window.location.pathname}`
+    : 'https://silcfcr.github.io/silvi-cycle-tracker/';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
+  });
   if (error) throw error;
-}
-
-async function verifyOTP(email, token) {
-  const sb = initSupabase();
-  const { data, error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
-  if (error) throw error;
-  return data.user;
 }
 
 async function migrateUserData(email, newId) {
@@ -321,7 +320,7 @@ export {
   MONTHS, MONTHS_S, DOW, fmtLong, fmtShort,
   PHASE, cycleInfo, isPredictedPeriod, daysUntil,
   KG_TO_LB, toDisplayWeight, fromDisplayWeight,
-  initSupabase, sendOTP, verifyOTP, migrateUserData, ensureUserRow,
+  initSupabase, sendMagicLink, migrateUserData, ensureUserRow,
   loadFromSupabase,
   useStore,
 };
