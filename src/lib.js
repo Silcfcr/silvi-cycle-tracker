@@ -91,24 +91,42 @@ function initSupabase() {
   return _sb;
 }
 
-async function lookupUserByEmail(email) {
+async function sendOTP(email) {
   const sb = initSupabase();
-  const { data, error } = await sb.from('users').select('*').eq('email', email).maybeSingle();
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
   if (error) throw error;
-  return data;
 }
 
-async function createSupabaseUser(email, firstName, lastName) {
+async function verifyOTP(email, token) {
   const sb = initSupabase();
-  const { data, error } = await sb.from('users')
-    .insert({ email, first_name: firstName, last_name: lastName, units: 'kg' })
-    .select().single();
+  const { data, error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
   if (error) throw error;
-  return data;
+  return data.user;
+}
+
+async function migrateUserData(email, newId) {
+  const sb = initSupabase();
+  const { error } = await sb.rpc('migrate_to_auth_user', { p_email: email, p_new_id: newId });
+  if (error) console.warn('Migration warning:', error.message);
+}
+
+async function ensureUserRow(userId, email) {
+  const sb = initSupabase();
+  // Run server-side migration first (handles old UUID → auth UUID, avoids email UNIQUE conflict)
+  await migrateUserData(email, userId);
+  // Check if row exists after migration
+  const { data } = await sb.from('users').select('id').eq('id', userId).maybeSingle();
+  if (!data) {
+    const { error } = await sb.from('users')
+      .insert({ id: userId, email, units: 'kg' })
+      .select().single();
+    if (error) throw error;
+  }
 }
 
 async function loadFromSupabase(userId) {
   const sb = initSupabase();
+
   const [settingsRes, periodsRes, moodsRes, weightsRes, userRes, measurementsRes] = await Promise.all([
     sb.from('cycle_settings').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('periods').select('*').eq('user_id', userId).order('started_at', { ascending: false }),
@@ -303,6 +321,7 @@ export {
   MONTHS, MONTHS_S, DOW, fmtLong, fmtShort,
   PHASE, cycleInfo, isPredictedPeriod, daysUntil,
   KG_TO_LB, toDisplayWeight, fromDisplayWeight,
-  initSupabase, lookupUserByEmail, createSupabaseUser, loadFromSupabase,
+  initSupabase, sendOTP, verifyOTP, migrateUserData, ensureUserRow,
+  loadFromSupabase,
   useStore,
 };

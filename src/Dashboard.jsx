@@ -3,7 +3,7 @@ import {
   toKey, parseKey, addDays, daysBetween, fmtLong, fmtShort,
   MONTHS, DOW, PHASE, cycleInfo, isPredictedPeriod, daysUntil,
   KG_TO_LB, toDisplayWeight, fromDisplayWeight,
-  initSupabase, lookupUserByEmail, createSupabaseUser,
+  initSupabase, sendOTP, verifyOTP, ensureUserRow,
   useStore, startOfDay,
 } from './lib.js';
 import { FaceSvg, MOOD_NAMES, MoodPicker, PhaseRing, CycleBar, Calendar, WeightChart, Stepper } from './components.jsx';
@@ -284,11 +284,10 @@ function RecentStrip({ data, onDaySelect }) {
 
 
 /* ── Login screen ──────────────────────────────────────────────────────────── */
-function LoginScreen({ onLogin }) {
+function LoginScreen() {
   const [email, setEmail] = React.useState('');
-  const [step, setStep] = React.useState('email'); // 'email' | 'name' | 'loading' | 'error'
-  const [firstName, setFirstName] = React.useState('');
-  const [lastName, setLastName] = React.useState('');
+  const [otp, setOtp] = React.useState('');
+  const [step, setStep] = React.useState('email'); // 'email' | 'otp' | 'loading' | 'error'
   const [errorMsg, setErrorMsg] = React.useState('');
 
   const handleEmail = async (e) => {
@@ -296,32 +295,34 @@ function LoginScreen({ onLogin }) {
     if (!email.trim()) return;
     setStep('loading');
     try {
-      const user = await lookupUserByEmail(email.trim().toLowerCase());
-      if (user) {
-        localStorage.setItem('silvi_user_id', user.id);
-        onLogin(user.id);
-      } else {
-        setStep('name');
-      }
+      await sendOTP(email.trim().toLowerCase());
+      setStep('otp');
     } catch (err) {
-      setErrorMsg('Could not connect to server. Check your connection.');
+      setErrorMsg('Could not send code. Check your connection and try again.');
       setStep('error');
     }
   };
 
-  const handleName = async (e) => {
+  const handleOTP = async (e) => {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim()) return;
+    if (!otp.trim()) return;
     setStep('loading');
     try {
-      const user = await createSupabaseUser(email.trim().toLowerCase(), firstName.trim(), lastName.trim());
-      localStorage.setItem('silvi_user_id', user.id);
-      onLogin(user.id);
+      const user = await verifyOTP(email.trim().toLowerCase(), otp.trim());
+      await ensureUserRow(user.id, user.email);
+      // onAuthStateChange in App.jsx handles the transition automatically
     } catch (err) {
-      setErrorMsg('Could not create account. Try again.');
+      const isAuthError = err?.message?.toLowerCase().includes('token') ||
+        err?.message?.toLowerCase().includes('otp') ||
+        err?.status === 401 || err?.status === 403;
+      setErrorMsg(isAuthError
+        ? 'Incorrect or expired code. Try again.'
+        : 'Signed in but could not load your account. Please refresh.');
       setStep('error');
     }
   };
+
+  const headings = { email: 'Welcome back.', otp: 'Check your email.', loading: 'Welcome back.', error: 'Welcome back.' };
 
   return (
     <div className="app">
@@ -331,7 +332,7 @@ function LoginScreen({ onLogin }) {
         <div style={{ position: 'relative', paddingTop: 34 }}>
           <div className="eyebrow on-band">Silvi</div>
           <h1 style={{ fontSize: 30, color: '#fff', marginTop: 10, lineHeight: 1.12, letterSpacing: '-0.01em' }}>
-            {step === 'name' ? 'Nice to meet you.' : 'Welcome back.'}
+            {headings[step] || 'Welcome back.'}
           </h1>
         </div>
       </div>
@@ -346,7 +347,7 @@ function LoginScreen({ onLogin }) {
         {step === 'error' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <p style={{ color: 'var(--rose-600)', fontSize: 14, textAlign: 'center' }}>{errorMsg}</p>
-            <button className="btn block" onClick={() => setStep('email')}>Try again</button>
+            <button className="btn block" onClick={() => { setErrorMsg(''); setStep('email'); }}>Try again</button>
           </div>
         )}
 
@@ -357,29 +358,25 @@ function LoginScreen({ onLogin }) {
               <input className="input" type="email" placeholder="you@example.com"
                 value={email} onChange={e => setEmail(e.target.value)} autoFocus required />
             </div>
-            <button className="btn block" type="submit" disabled={!email.trim()}>Continue</button>
+            <button className="btn block" type="submit" disabled={!email.trim()}>Send code</button>
           </form>
         )}
 
-        {step === 'name' && (
-          <form onSubmit={handleName} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {step === 'otp' && (
+          <form onSubmit={handleOTP} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              No account found for <strong>{email}</strong>. Let's create one.
+              We sent a 6-digit code to <strong>{email}</strong>.
             </p>
             <div className="field">
-              <label>First name</label>
-              <input className="input" type="text" value={firstName}
-                onChange={e => setFirstName(e.target.value)} autoFocus required />
+              <label>Verification code</label>
+              <input className="input" type="text" inputMode="numeric" pattern="[0-9]*"
+                placeholder="123456" maxLength={6}
+                value={otp} onChange={e => setOtp(e.target.value)} autoFocus required />
             </div>
-            <div className="field">
-              <label>Last name</label>
-              <input className="input" type="text" value={lastName}
-                onChange={e => setLastName(e.target.value)} required />
-            </div>
-            <button className="btn block" type="submit"
-              disabled={!firstName.trim() || !lastName.trim()}>Create account</button>
+            {errorMsg && <p style={{ color: 'var(--rose-600)', fontSize: 13, margin: 0 }}>{errorMsg}</p>}
+            <button className="btn block" type="submit" disabled={otp.trim().length < 6}>Verify</button>
             <button type="button" className="btn ghost block"
-              onClick={() => setStep('email')}>Back</button>
+              onClick={() => { setOtp(''); setErrorMsg(''); setStep('email'); }}>Back</button>
           </form>
         )}
       </div>

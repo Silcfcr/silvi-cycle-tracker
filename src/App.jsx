@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStore } from './lib.js';
+import { useStore, initSupabase } from './lib.js';
 import { Dashboard, LoginScreen } from './Dashboard.jsx';
 import { Onboarding } from './Onboarding.jsx';
 import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio } from './tweaks.jsx';
@@ -18,7 +18,21 @@ const TWEAK_DEFAULTS = {
 };
 
 export default function App() {
-  const [userId, setUserId] = React.useState(() => localStorage.getItem('silvi_user_id'));
+  const [userId, setUserId] = React.useState(null);
+  const [authChecked, setAuthChecked] = React.useState(false);
+
+  React.useEffect(() => {
+    const sb = initSupabase();
+    sb.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+      setAuthChecked(true);
+    });
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [data, api, ready] = useStore(userId);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
@@ -33,13 +47,15 @@ export default function App() {
 
   return (
     <React.Fragment>
-      {!userId
-        ? <LoginScreen onLogin={setUserId} />
-        : !ready
-          ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
-          : !data.setup
-            ? <Onboarding onDone={api.setSetup} userId={userId} />
-            : <Dashboard data={data} api={api} tweaks={t} userId={userId} />}
+      {!authChecked
+        ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
+        : !userId
+          ? <LoginScreen />
+          : !ready
+            ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
+            : !data.setup
+              ? <Onboarding onDone={api.setSetup} userId={userId} />
+              : <Dashboard data={data} api={api} tweaks={t} userId={userId} />}
       <TweaksPanel title="Tweaks">
         <TweakSection label="Accent" />
         <TweakColor label="Palette" value={t.accent}
